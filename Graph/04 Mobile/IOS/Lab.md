@@ -45,45 +45,30 @@ In this exercise you will use an existing application with the AzureAD
 authentication included, to add Microsoft Graph SDK for iOS, ADAL for iOS, Office Rest Client for iOS libraries in the project.
 
 01. Locate the [\\\O3651\O3651-6 Mobile\IOS\Lab Files](Lab Files) folder that contains a starter project.
-02. In Finder, navigate to the Lab Files folder and open the **Podfile** file under the root folder of the project and add the following lines to the end of the file:
-
-    ```ruby
-    target 'IOSOffice365Calendar' do
-    	pod 'ADALiOS', '=1.2.4'
-    	pod 'orc'
-    	pod 'MSGraphSDK', '=0.10.1'
-	end
-    ```
-
-    ![Screenshot of the previous step](img/07.png)
-03. **Save** the Podfile.
-04. Open a Terminal and navigate to the `Lab Files/IOSOffice365Calendar` folder of the project.
-
-    Execute the following command and wait for the CocoaPods to install:
-
-    ```bash
-    pod install
-    ```
-
-05. Open the **.xcworkspace** file in the **IOSOffice365Calendar** folder
-
-06. Find and open the **Auth.plist** file.
-
-07. Fill the AzureAD account settings with the following configuration values:
-    -   **resourceId**        - "https://graph.microsoft.com/"
-    -   **authority**         - "https://login.microsoftonline.com/common"
-    -   **redirectUriString** - The redirect URL configured in Azure AD
-    -   **clientId**          - The client Id obtained from Azure AD
-
-    ![Screenshot of the previous step](img/fig.01.png)
-
-08. In your XCode workspace, expand the Pods > ADALiOS > Resources folder. Select the `ADAL_iPad_Storyboard.storyboard` and set the Interface Building Document Builds for `iOS 7.0 and Later`. Then select `ADAL_iPhone_Storyboard.storyboard` file set the Interface Building Document Builds for `iOS 7.0 and Later`.
-
-    ![Screenshot of the previous step](img/fig.16.png)
-
-09. Build and Run the project in an iOS Simulator to check the views. You will see a login page with buttons to access the application and to clear credentials.  At this point the app does not include the code required to authenticateor return calendar events.  Close the app.
-
-    ![Screenshot of the previous step](img/fig.02.png)
+02. If you do not have Carthage installed, go ahead and install Carthage on your Mac. If you have brew, you can install it with the following command.
+```shell
+brew install Carthage
+```
+03. Create a cartfile: Copy `echo "github \"AzureAD/microsoft-authentication-library-for-objc\" \"master\"" > Cartfile` into the terminal and run the command.
+04. Build the MSAL library: Copy `carthage update` into the terminal and run the command.
+05. Edit the info.plist file and add the following xml to the end of the file.
+```xml
+<key>CFBundleURLTypes</key>
+<array>
+    <dict>
+        <key>CFBundleTypeRole</key>
+        <string>Editor</string>
+        <key>CFBundleURLName</key>
+        <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+        <key>CFBundleURLSchemes</key>
+        <array>
+            <string>msalENTER_YOUR_CLIENT_ID</string>
+            <string>auth</string>
+        </array>
+    </dict>
+</array>
+```
+06. Replace the `ENTER_YOUR_CLIENT_ID` with the **Application Id** you received when registering the application.
 
 ## Exercise 2: Authenticate with Azure AD and get the access token
 An access token is required to access Microsoft Graph APIs so your application needs to implement the logic to retrieve and manage access tokens. The [Azure Active Directory authentication library (ADAL) for iOS and OSX](https://github.com/AzureAD/azure-activedirectory-library-for-objc) provides you with the ability to manage authentication in your application with just a few lines of code. Learn more about authentication with Azure Active Directory in [What is Azure Active Directory? on Azure.com](https://azure.microsoft.com/en-us/documentation/articles/active-directory-whatis/). The first thing you'll do is create a header file and class named AuthenticationManager that uses the ADAL for iOS and OSX to manage authentication for your app.
