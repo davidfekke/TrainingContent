@@ -354,12 +354,8 @@ NSString * const kAuthority   = @"https://login.microsoftonline.com/common/v2.0"
                 } else {
                     dispatch_async(dispatch_get_main_queue(), ^{
                         [self showLoadingUI:NO];
-                        //[self showMessage:@"Authentication Succeeded." withTitle:@"Success"];
+                        [self showMessage:@"Authentication Succeeded." withTitle:@"Success"];
                         
-                        UIStoryboard *board = [UIStoryboard storyboardWithName:@"Main" bundle:NSBundle.mainBundle];
-                        UIViewController *calVC = [board instantiateViewControllerWithIdentifier:@"calendarList"];
-                        
-                        [self.navigationController pushViewController:calVC animated:YES];
                         NSLog(@"%@", [authenticationManager userID]);
                     });
                 }
@@ -367,6 +363,8 @@ NSString * const kAuthority   = @"https://login.microsoftonline.com/common/v2.0"
         }
     }];
    ```
+   ![Screenshot of the previous step](img/fig.31.png)
+
 03. Open the LoginViewController.m file, add the following code to **clearAction**
 
 ```objc
@@ -393,6 +391,29 @@ NSString * const kAuthority   = @"https://login.microsoftonline.com/common/v2.0"
 ## Exercise 3: Connect to the Microsoft Graph to get Calendar events
 
 In this exercise you will connect your application to get a **MSGraph** with a REST API call. We can get the calendar events form this client.
+
+01. Alter the **LoginViewController.m** file, and add a transition to the CalendarTableViewController in the `-(IBAction)loginAction:(id)sender` method.
+
+```objc
+[authenticationManager acquireAuthTokenWithScopes:self.scopes completion:^(MSALErrorCode error) {
+                if(error){
+                    [self showLoadingUI:NO];
+                    [self showMessage:@"Please see the log for more details" withTitle:@"AcquireAuthToken Error"];
+                } else {
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        [self showLoadingUI:NO];
+                        //[self showMessage:@"Authentication Succeeded." withTitle:@"Success"];
+                        
+                        UIStoryboard *board = [UIStoryboard storyboardWithName:@"Main" bundle:NSBundle.mainBundle];
+                        UIViewController *calVC = [board instantiateViewControllerWithIdentifier:@"calendarList"];
+                        
+                        [self.navigationController pushViewController:calVC animated:YES];
+                        NSLog(@"%@", [authenticationManager userID]);
+                    });
+                }
+            }];
+``` 
+![Screenshot of the previous step](img/fig.32.png)
 
 01. Go to **CalendarTableViewController.m**, and import the following header file
 ```objc
