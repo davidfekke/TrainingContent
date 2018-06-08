@@ -96,6 +96,24 @@ An access token is required to access Microsoft Graph APIs so your application n
 03. Click **Create** to create the class and header files.
 ![Screenshot of the previous step](img/fig.03.png)
 
+### Make a change to the **AppDelegate.m** implementation file.
+
+01. Add the following import statement to the **AppDelegate.m** file.
+```objc
+#import <MSAL/msal.h>
+```
+
+02. Add the `openURL` method to the implementation of your **AppDelegate.m** file.
+```objc
+- (BOOL)application:(UIApplication *)app openURL:(NSURL *)url options:(NSDictionary<NSString *,id> *)options
+{
+    
+    [MSALPublicClientApplication handleMSALResponse:url];
+    
+    return YES;
+}
+```
+
 ### To code the AuthenticationManager header file
 
 01. Specify the **AuthenticationManager** class as a singleton in the to **AuthenticationManager.h**.
