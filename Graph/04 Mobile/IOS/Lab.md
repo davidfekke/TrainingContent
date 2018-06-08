@@ -14,11 +14,11 @@ The lab demonstrates how use an AzureAD account to authenticate and call the Mic
 
 1. OSX 10.X environment
 2. [XCode 9][xcode-9]
-3. [Cocoapods dependency manager][cocoapods]
+3. [Carthage dependency manager][cocoapods]
 4. This lab requires you to use multiple starter files or an entire starter project from the GitHub location. You can either download the whole repo as a zip or clone the repo https://github.com/OfficeDev/TrainingContent.git for those familiar with git.
 
 [xcode-9]: https://itunes.apple.com/nz/app/xcode/id497799835?mt=12
-[cocoapods]: https://cocoapods.org/
+[carthage]: https://github.com/Carthage/Carthage
 
 ## Register your application with Office 365
 1. Sign into the [https://apps.dev.microsoft.com//](https://apps.dev.microsoft.com/") using your Office 365 Developer Site credentials.
@@ -40,9 +40,9 @@ The lab demonstrates how use an AzureAD account to authenticate and call the Mic
 14. Copy the value specified for **Application ID**; you will need this later when coding the IOSOffice365Calendar project.
 ![Screenshot of the previous step](img/fig.21.png)
 
-## Exercise 1: Add Microsoft Graph SDK for iOS, ADAL for iOS, Office Rest Client for iOS libraries to a project
+## Exercise 1: Add Microsoft Authentication Library for iOS, Rest Client for iOS libraries to a project
 In this exercise you will use an existing application with the AzureAD
-authentication included, to add Microsoft Graph SDK for iOS, ADAL for iOS, Office Rest Client for iOS libraries in the project.
+authentication included, to add Microsoft Authentication Library for iOS libraries in the project.
 
 01. Locate the [\\\O3651\O3651-6 Mobile\IOS\Lab Files](Lab Files) folder that contains a starter project.
 02. If you do not have Carthage installed, go ahead and install Carthage on your Mac. If you have brew, you can install it with the following command.
@@ -51,7 +51,22 @@ brew install Carthage
 ```
 03. Create a cartfile: Copy `echo "github \"AzureAD/microsoft-authentication-library-for-objc\" \"master\"" > Cartfile` into the terminal and run the command.
 04. Build the MSAL library: Copy `carthage update` into the terminal and run the command.
-05. Edit the info.plist file and add the following xml to the end of the file.
+05. Open Project -> General tab, and click and drag the `MSAL.framework` into the `Linked Frameworks and Libraries`.
+
+![Screenshot of the previous step](img/fig.23.png)
+
+06. Click on the `Build Phases` tab and select the `IOSOffice365Calendar` under TARGETS. Click on the `+` symbol on the top left hand corner of the tab, and select `New Run Script Phase`.
+07. Add the following command;
+```
+/usr/local/bin/carthage copy-frameworks
+```
+08. Click the + under Input Files and add an entry for each framework.
+```
+$(SRCROOT)/Carthage/Build/iOS/MSAL.framework
+```
+![Screenshot of the previous step](img/fig.24.png)
+
+09. Edit the info.plist file and add the following xml to the end of the file.
 ```xml
 <key>CFBundleURLTypes</key>
 <array>
@@ -70,8 +85,10 @@ brew install Carthage
 ```
 06. Replace the `ENTER_YOUR_CLIENT_ID` with the **Application Id** you received when registering the application.
 
+![Screenshot of the previous step](img/fig.22.png)
+
 ## Exercise 2: Authenticate with Azure AD and get the access token
-An access token is required to access Microsoft Graph APIs so your application needs to implement the logic to retrieve and manage access tokens. The [Azure Active Directory authentication library (ADAL) for iOS and OSX](https://github.com/AzureAD/azure-activedirectory-library-for-objc) provides you with the ability to manage authentication in your application with just a few lines of code. Learn more about authentication with Azure Active Directory in [What is Azure Active Directory? on Azure.com](https://azure.microsoft.com/en-us/documentation/articles/active-directory-whatis/). The first thing you'll do is create a header file and class named AuthenticationManager that uses the ADAL for iOS and OSX to manage authentication for your app.
+An access token is required to access Microsoft Graph APIs so your application needs to implement the logic to retrieve and manage access tokens.
 
 ### To create the AuthenticationManager class
 01. Right-click the IOSOffice365Calendar project folder, select **New File**, and in the **iOS** section, click **Cocoa Touch Class**, and then click **Next**.
@@ -80,150 +97,277 @@ An access token is required to access Microsoft Graph APIs so your application n
 ![Screenshot of the previous step](img/fig.03.png)
 
 ### To code the AuthenticationManager header file
-01. Import the necessary Microsoft Graph SDK and ADAL SDK header files by adding the following code directives to **AuthenticationManager.h**
 
-	```objc
-	#import <ADALiOS/ADAL.h>
-	#import <orc/impl/impl.h>
-	#import <MSGraphSDK/MSGraphSDK.h>
-	```
-
-02. Declare a property for the **ADALDependencyResolver** object from the **ADAL SDK** which uses dependency injection to provide access to the authentication objects.
-
-	```objc
-	@property (readonly, nonatomic) ADALDependencyResolver *dependencyResolver;
-	```
-
-03. Specify the **AuthenticationManager** class as a singleton.
+01. Specify the **AuthenticationManager** class as a singleton in the to **AuthenticationManager.h**.
 
 	```objc
 	+(AuthenticationManager *)sharedInstance;
 	```
-04. Declare the methods for retrieving and clearing the access and refresh tokens.
+02. Add the following properties in AuthenticationManager header file.
+```objc
+@property (nonatomic, strong) NSString *accessToken;
+@property (nonatomic, strong) NSString *userID;
+@property (nonatomic, strong) MSALPublicClientApplication *msalClient;
+@property (nonatomic, weak) NSString *clientId;
+@property (nonatomic, weak) NSString *authorty;
+@property (nonatomic, strong) MSALUser *user;
+```
+03. Declare the methods for retrieving and clearing the access and refresh tokens.
 
     ```objc
 	//retrieve token
-	-(void)acquireAuthTokenWithResourceId:(NSString *)resourceId completionHandler:(void (^)(BOOL authenticated, NSString* accessToken))completionBlock;
-	//clear token
-	-(void)clearCredentials;
+    + (AuthenticationManager*)sharedInstance;
+
+    - (void)initWithAuthority:(NSString*)authority
+                   completion:(void (^)(NSError *error))completion;
+
+    - (void)acquireAuthTokenWithScopes:(NSArray<NSString *> *)scopes
+                            completion:(void(^)(MSALErrorCode error))completion;
+
+    -(void) acquireAuthTokenCompletion:(void (^)(MSALErrorCode *error))completion;
+
+    // Clears the ADAL token cache and the cookie cache.
+    - (void) clearCredentials;
+
+    - (NSString *) getRedirectUrlFromMSALArray:(NSArray *) array;
     ```
 
-    ![Screenshot of the previous step](img/fig.08.png)
+    ![Screenshot of the previous step](img/fig.26.png)
 
 ### To code the AuthenticationManager class
-01. In the **interface** declaration, above **@implementation**, declare the following properties
-	```objc
-	@interface AuthenticationManager ()
-	@property (strong,    nonatomic) ADAuthenticationContext *authContext;
-	@property (readonly, nonatomic) NSURL    *redirectURL;
-	@property (readonly, nonatomic) NSString *authority;
-	@property (readonly, nonatomic) NSString *clientId;
-	@end
-	```
 
-2. Add code for the constructor to the implementation.
+01. Add code for the constructor to the implementation in the **AuthenticationManager.m** file.
 
     ```objc
-	-(instancetype)init
-	{
-	    self = [super init];	    
-	    if (self) {
-	        //Azure AD account info
-	        NSString* plistPath = [[NSBundle mainBundle] pathForResource:@"Auth" ofType:@"plist"];
-	        NSDictionary *content = [NSDictionary dictionaryWithContentsOfFile:plistPath];
-	        _authority = [content objectForKey:@"authority"];
-	        _clientId = [content objectForKey:@"clientId"];
-	        _redirectURL = [NSURL URLWithString:[content objectForKey:@"redirectUriString"]];
-	    }
-	    return self;
-	}
+    #pragma mark - init
+    - (void)initWithAuthority:(NSString*)authority_
+                completion:(void (^)(NSError* error))completion
+    {
+        
+        //Get the MSAL client Id for this Azure app registration. We store it in the main bundle
+        NSDictionary *dictionary = [NSDictionary dictionaryWithContentsOfFile:[[NSBundle mainBundle] pathForResource:@"Info" ofType:@"plist"]];
+        NSArray *array = [dictionary objectForKey:@"CFBundleURLTypes"];
+        NSString *redirectUrl = [self getRedirectUrlFromMSALArray:(array)];
+        
+        NSRange range = [redirectUrl rangeOfString:@"msal"];
+        NSString *kClientId = [[redirectUrl substringFromIndex:NSMaxRange(range)] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+        NSLog(@"client id = %@", kClientId);
+        
+        self.clientId = kClientId;
+        self.authorty = authority_;
+        
+        NSError *error_ = nil;
+        @try {
+            self.msalClient = [[MSALPublicClientApplication alloc] initWithClientId:kClientId error:&error_];
+            if (error_) {
+                completion(error_);
+            } else {
+                completion(nil);}
+            
+        }
+        @catch(NSException *exception) {
+            NSMutableDictionary * info = [NSMutableDictionary dictionary];
+            [info setValue:exception.name forKey:@"ExceptionName"];
+            [info setValue:exception.reason forKey:@"ExceptionReason"];
+            [info setValue:exception.callStackReturnAddresses forKey:@"ExceptionCallStackReturnAddresses"];
+            [info setValue:exception.callStackSymbols forKey:@"ExceptionCallStackSymbols"];
+            [info setValue:exception.userInfo forKey:@"ExceptionUserInfo"];
+            
+            NSError *error = [[NSError alloc] initWithDomain:MSALErrorDomain code:MSALErrorInternal userInfo:info];
+            //use error
+            completion(error);
+        }
+        
+    }
 	```
 
 3. Add the following code to use a single authentication manager for the application.
 
 	```objc
-	+(AuthenticationManager *)sharedInstance
-	{
-	    static AuthenticationManager *sharedInstance;
-	    static dispatch_once_t onceToken;
-	    // Initialize the AuthenticationManager only once.
-	    dispatch_once(&onceToken, ^{
-	        sharedInstance = [[AuthenticationManager alloc] init];
-	    });
-	    return sharedInstance;
-	}
+	#pragma mark - singleton
+    + (AuthenticationManager *)sharedInstance
+    {
+        static AuthenticationManager *sharedInstance;
+        static dispatch_once_t onceToken;
+        
+        // Initialize the AuthenticationManager only once.
+        dispatch_once(&onceToken, ^{
+            sharedInstance = [[AuthenticationManager alloc] init];
+        });
+        
+        return sharedInstance;
+    }
 	```
 
-	![Screenshot of the previous step](img/fig.09.png)
+	![Screenshot of the previous step](img/fig.25.png)
 
-4. Acquire access and refresh tokens from Azure AD for the user.
+4. Acquire access and refresh tokens from Office 365 for the user.
 
 ```objc
-  -(void)acquireAuthTokenWithResourceId:(NSString *)resourceId completionHandler:(void (^)(BOOL authenticated, NSString* accessToken))completionBlock
-  {
-    ADAuthenticationError *error;
-    self.authContext = [ADAuthenticationContext authenticationContextWithAuthority:self.authority error:&error];
-    [self.authContext acquireTokenWithResource:resourceId
-                                      clientId:self.clientId
-                                   redirectUri:self.redirectURL
-                               completionBlock:^(ADAuthenticationResult *result) {
-                                   if (AD_SUCCEEDED != result.status) {
-                                       completionBlock(NO, nil);
-                                   }
-                                   else {
-                                       completionBlock(YES, result.accessToken);
-                                   }
-                               }];
-  }
+    #pragma mark - acquire token
+
+    - (void)acquireAuthTokenWithScopes:(NSArray<NSString *> *)scopes
+                            completion:(void(^)(MSALErrorCode error))completion {
+        
+        NSError  __autoreleasing  *error_ = nil;
+        
+        NSArray<MSALUser *> *users = [self.msalClient users:(&error_)];
+        
+        // We check to see if we have a current logged in user. If we don't, then we need to sign someone in.
+        // We throw an interactionRequired so that we trigger the interactive signin.
+        
+        if (self.msalClient == nil) {
+            completion(MSALErrorInternal);
+            
+        }
+        
+        if (users == nil | [users count] == 0) {
+            @try {
+                [self.msalClient acquireTokenForScopes:scopes completionBlock:^(MSALResult *result, NSError *error) {
+                    if (error) {
+                        completion(error.code);
+                    } else {
+                        self.clientId = self.msalClient.clientId;
+                        self.accessToken = result.accessToken;
+                        
+                        self.user = result.user;
+                        self.userID = result.user.displayableId;
+                        completion(0);
+                        
+                    }
+                }];
+            }
+            @catch (NSException *exception) {
+                completion(MSALErrorInternal);
+            }
+            
+        } else {
+            @try {
+                self.user =  [users objectAtIndex:0];
+                [self.msalClient acquireTokenSilentForScopes:scopes user:self.user completionBlock:^(MSALResult *result, NSError *error) {
+                    if (error) {
+                        completion(MSALErrorInteractionRequired);
+                    } else {
+                        self.clientId = self.msalClient.clientId;
+                        self.accessToken = result.accessToken;
+                        self.userID = result.user.displayableId;
+                        
+                        completion(0);
+                        
+                    }
+                }];
+            }
+            @catch (NSException *exception) {
+                completion(MSALErrorInternal);
+            }
+            
+        }
+        
+    }
 ```
     >**Note:** The first time the application runs, a request is sent to the URL specified for the AUTHORITY const, which the redirects you to a login page where you can enter your credentials. If your login is successful, the response contains the access and refresh tokens. Subsequent times when the application runs, the authentication manager will use the access or refresh token for authenticating client requests, unless the token cache is cleared.
 
 5. Finally, add code to log out the user by clearing the token cache and removing the application's cookies.
 
 	```objc
-	-(void)clearCredentials{
-	    id<ADTokenCacheStoring> cache = [ADAuthenticationSettings sharedInstance].defaultTokenCacheStore;
-	    ADAuthenticationError *error;
-	    if ([[cache allItemsWithError:&error] count] > 0)
-	        [cache removeAllWithError:&error];
-	    NSHTTPCookieStorage *cookieStore = [NSHTTPCookieStorage sharedHTTPCookieStorage];
-	    for (NSHTTPCookie *cookie in cookieStore.cookies) {
-	        [cookieStore deleteCookie:cookie];
-	    }
-	}
+	#pragma mark - clear credentials
+    //Clears the ADAL token cache and the cookie cache.
+    - (void)clearCredentials {
+        
+        NSError *error_ = nil;
+        [self.msalClient removeUser:self.user error:&error_];
+    }
 	```
 
-	![Screenshot of the previous step](img/fig.10.png)
+06. Add the following two methods to complete the **AuthenticationManager**.
+
+```objc
+-(void) acquireAuthTokenCompletion:(void (^)(MSALErrorCode *error))completion{
+}
+
+#pragma mark - Get client id from bundle
+
+- (NSString *) getRedirectUrlFromMSALArray:(NSArray *) array {
+    NSDictionary *arrayElement = [array objectAtIndex: 0];
+    NSArray *redirectArray = [arrayElement valueForKeyPath:@"CFBundleURLSchemes"];
+    NSString *substring = [redirectArray objectAtIndex:0];
+    return substring;
+}
+```
 
 
 ### To code the Login Action
-1. Open the LoginViewController.h file, and import the **AuthenticationManager.h**
+01. Open the LoginViewController.m file, and import the **AuthenticationManager.h**
    ```objc
    #import "AuthenticationManager.h"
    ```
-2. Open the LoginViewController.m file, add the following code to **loginAction**
+02. Add the following code between the import statements and the `@implementation` statement.
+
+```objc
+NSString * const kAuthority   = @"https://login.microsoftonline.com/common/v2.0";
+
+@interface LoginViewController()
+
+@property (weak, nonatomic) NSArray *scopes;
+
+@end
+```
+
+03. Add a `showLoadingUI` method to the implmentation.
+
+```objc
+- (void)showLoadingUI:(BOOL)loading {
+    if(loading){
+        [self.loginButton setTitle:@"Connecting..." forState:UIControlStateNormal];
+        self.loginButton.enabled = NO;
+    }
+    else{
+        [self.loginButton setTitle:@"Connect to Office 365" forState:UIControlStateNormal];
+        self.loginButton.enabled = YES;
+    }
+}
+```
+![Screenshot of the previous step](img/fig.27.png)
+
+04. Open the LoginViewController.m file, add the following code to **loginAction**
 
    ```objc
-   NSString* plistPath = [[NSBundle mainBundle] pathForResource:@"Auth" ofType:@"plist"];
-   NSDictionary *content = [NSDictionary dictionaryWithContentsOfFile:plistPath];
-   NSString* graphResourceId= [content objectForKey:@"resourceId"];
-   AuthenticationManager *authenticationManager = [AuthenticationManager sharedInstance];
-   [authenticationManager acquireAuthTokenWithResourceId:graphResourceId
-                                       completionHandler:^(BOOL authenticated, NSString* accessToken) {
-                                           if(authenticated){
-                                               dispatch_async(dispatch_get_main_queue(), ^{
-                                                   [self showMessage:@"Authentication Succeeded." withTitle:@"Success"];
-                                               });
-                                           }
-                                           else{
-                                               dispatch_async(dispatch_get_main_queue(), ^{
-                                                   NSLog(@"Error in the authentication");
-                                                   [self showMessage:@"Authentication failed. Check the log for errors." withTitle:@"Error"];
-                                               });
-                                           }
-                                       }];
+   [self showLoadingUI:YES];
+    
+    self.scopes = [NSArray arrayWithObjects:@"https://graph.microsoft.com/Mail.ReadWrite",
+                   @"https://graph.microsoft.com/Mail.Send",
+                   @"https://graph.microsoft.com/Files.ReadWrite",
+                   @"https://graph.microsoft.com/User.ReadBasic.All",
+                   @"https://graph.microsoft.com/User.Read",
+                   @"https://graph.microsoft.com/Calendars.Read", nil];
+
+    AuthenticationManager *authenticationManager = [AuthenticationManager sharedInstance];
+    [authenticationManager initWithAuthority:kAuthority completion:^(NSError *error) {
+        if (error) {
+            [self showLoadingUI:NO];
+            [self showMessage:@"Please see the log for more details" withTitle:@"InitWithAuthority Error"];
+        } else {
+            [authenticationManager acquireAuthTokenWithScopes:self.scopes completion:^(MSALErrorCode error) {
+                if(error){
+                    [self showLoadingUI:NO];
+                    [self showMessage:@"Please see the log for more details" withTitle:@"AcquireAuthToken Error"];
+                } else {
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        [self showLoadingUI:NO];
+                        //[self showMessage:@"Authentication Succeeded." withTitle:@"Success"];
+                        
+                        UIStoryboard *board = [UIStoryboard storyboardWithName:@"Main" bundle:NSBundle.mainBundle];
+                        UIViewController *calVC = [board instantiateViewControllerWithIdentifier:@"calendarList"];
+                        
+                        [self.navigationController pushViewController:calVC animated:YES];
+                        NSLog(@"%@", [authenticationManager userID]);
+                    });
+                }
+            }];
+        }
+    }];
    ```
-3. Open the LoginViewController.m file, add the following code to **clearAction**
+03. Open the LoginViewController.m file, add the following code to **clearAction**
 
 ```objc
     AuthenticationManager *authenticationManager = [AuthenticationManager sharedInstance];
@@ -231,9 +375,9 @@ An access token is required to access Microsoft Graph APIs so your application n
     [self showMessage:@"Cookies Cleared" withTitle:@"Success"];
 ```
 
-   ![Screenshot of the previous step](img/fig.11.png)
 
-4. Build and run, now you can click **Login** to Authenticate with Azure AD
+
+04. Build and run, now you can click **Login** to Authenticate with Office 365
 
    ![Screenshot of the previous step](img/fig.12.png)
 
@@ -248,112 +392,91 @@ An access token is required to access Microsoft Graph APIs so your application n
 
 ## Exercise 3: Connect to the Microsoft Graph to get Calendar events
 
-In this exercise you will connect your application to get a **MSGraphClient**. We can get the calendar events form this client.
+In this exercise you will connect your application to get a **MSGraph** with a REST API call. We can get the calendar events form this client.
 
-01. Import the necessary MSBlockAuthenticationProvider header file by adding the following code directive to the **LoginViewController.m** class
-
-	```objc
-	#import <MSGraphSDK/MSBlockAuthenticationProvider.h>
-	```
-
-02. Go to **LoginViewController.m** and find the **loginAction** method, replace **[self showMessage:@"Authentication Succeeded." withTitle:@"Success"];** with the following code:
-
-    ```objc                                           
-    MSBlockAuthenticationProvider *provider = [MSBlockAuthenticationProvider providerWithBlock:^(NSMutableURLRequest *request, MSAuthenticationCompletion completion) {
-                                                        NSString *oauthAuthorizationHeader = [NSString stringWithFormat:@"bearer %@", accessToken];
-                                                        [request setValue:oauthAuthorizationHeader forHTTPHeaderField:@"Authorization"];
-                                                        completion(request, nil);
-                                                    }];
-                                                    [MSGraphClient setAuthenticationProvider:provider];
-                                                    dispatch_async(dispatch_get_main_queue(), ^{
-                                                        CalendarTableViewController *controller = [[UIStoryboard storyboardWithName:@"Main" bundle:nil] instantiateViewControllerWithIdentifier:@"calendarList"];
-                                                        [controller initGraphClient:[MSGraphClient client]];
-                                                        [self.navigationController pushViewController:controller animated:YES];
-                                                    });
-    ```
-    ![Screenshot of the previous step](img/fig.07.png)
-
-03. Go to **CalendarTableViewController.h**, and import the following header files
+01. Go to **CalendarTableViewController.m**, and import the following header file
 ```objc
-	#import <ADALiOS/ADAL.h>
-	#import <orc/impl/impl.h>
-	#import <MSGraphSDK/MSGraphSDK.h>
-```
-04. Declare a property to access the Microsoft Graph client.
-
-```objc
-	@property (strong, nonatomic) MSGraphClient *graphCilent;
+    #import <MSAL/msal.h>
 ```
 
-05. Specify the following function to store the Microsoft Graph client.
-
-```objc
-	-(void)initGraphClient:(MSGraphClient *)client;
-```
 	
-![Screenshot of the previous step](img/fig.15.png)
+![Screenshot of the previous step](img/fig.30.png)
 
-06. Go to **CalendarTableViewController.m**, and add the following code to store the **MSGraphClient**
+
+02. Add the following code into the bottom of the function **getEvents** to get the Login user's calendar events via the NSURLSession
 ```objc
-	-(void)initGraphClient:(MSGraphClient *)client{
-	    self.graphCilent = client;
-	}
-```
-07. Add the following code into the bottom of the function **getEvents** to get the Login user's calendar events via the MSGraphClient
-```objc
+    AuthenticationManager *authManager = [AuthenticationManager sharedInstance];
+    
     UIActivityIndicatorView* spinner = [[UIActivityIndicatorView alloc]initWithFrame:CGRectMake(100,100,50,50)];
     spinner.activityIndicatorViewStyle = UIActivityIndicatorViewStyleWhiteLarge;
     [spinner setColor:[UIColor blackColor]];
     [self.view addSubview:spinner];
     spinner.hidesWhenStopped = YES;
     [spinner startAnimating];
-    NSCalendar *calendar = [NSCalendar autoupdatingCurrentCalendar];
-    NSDateComponents *components = [calendar components:NSCalendarUnitYear
-                                    | NSCalendarUnitMonth | NSCalendarUnitDay
-                                               fromDate:[NSDate date]];
-    components.day = components.day -30;
-    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
-    [formatter setDateFormat:@"yyyy'-'MM'-'dd"];
-    NSString *lastMonth =[formatter stringFromDate: [calendar dateFromComponents:components]];
-    NSString *filterValue =[NSString stringWithFormat:@"Start/DateTime ge '%@'",lastMonth];
-    MSQueryParameters* filter = [[MSQueryParameters alloc] initWithKey: @"$filter" value:filterValue];
-    MSTopOptions* top = [MSTopOptions top:100];
-    MSSelectOptions* select = [MSSelectOptions select:@"subject,start,end"];
-    NSArray *options = [NSArray arrayWithObjects: filter, top, select, nil];
-    [[[[self.graphCilent me] events] requestWithOptions:options] getWithCompletion:^(MSCollection *response, MSGraphUserEventsCollectionRequest *nextRequest, NSError *error) {
-        for(MSGraphEvent* event in response.value ) {
-            [self.eventsList addObject:event];
-        }
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [spinner stopAnimating];
-            [spinner removeFromSuperview];
-            [self.tableView reloadData];
-        });
-    }];
+    
+    NSString *dataUrl = @"https://graph.microsoft.com/v1.0/me/events?$select=subject,body,bodyPreview,organizer,attendees,start,end,location";
+    NSURL *url = [NSURL URLWithString:dataUrl];
+    NSURLSessionConfiguration *config = [NSURLSessionConfiguration defaultSessionConfiguration];
+    NSURLSession *session = [NSURLSession sessionWithConfiguration:config];
+    
+    // 2
+    NSMutableURLRequest *request = [[NSMutableURLRequest alloc] initWithURL:url];
+    request.HTTPMethod = @"GET";
+    
+    [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
+    [request setValue:@"application/json, text/plain, */*" forHTTPHeaderField:@"Accept"];
+    
+    NSString *authorization = [NSString stringWithFormat:@"Bearer %@", authManager.accessToken];
+    [request setValue:authorization forHTTPHeaderField:@"Authorization"];
+    
+    __weak CalendarTableViewController *weakSelf = self;
+    NSURLSessionDataTask *task = [session dataTaskWithRequest:request
+                                            completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+                                                // ...
+                                                CalendarTableViewController *strongSelf = weakSelf;
+                                                NSError *jsonError = nil;
+
+                                                NSDictionary *jsonFinal = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonError];
+                                                if (jsonError)
+                                                {
+                                                    NSLog(@"Error: %@", jsonError);
+                                                }
+                                                self.eventsList = [jsonFinal valueForKey:@"value"];
+                                                dispatch_async(dispatch_get_main_queue(), ^{
+                                                    [spinner stopAnimating];
+                                                    [spinner removeFromSuperview];
+                                                    [strongSelf.tableView reloadData];
+                                                });
+                                            }];
+    
+    [task resume];
 ```
 
-![Screenshot of the previous step](img/fig.06.png)
+![Screenshot of the previous step](img/fig.29.png)
 
-08. Go to the following function
+03. Go to the following function
 
 ```objc
 	- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
 ```
 
-09. Add the following code into the bottom of the function **cellForRowAtIndexPath**
+04. Add the following code into the bottom of the function **cellForRowAtIndexPath**
 
 ```objc
     UILabel *subjectLabel = (UILabel *)[cell viewWithTag:100];
-    subjectLabel.text = ((MSGraphEvent *)[self.eventsList objectAtIndex:indexPath.row]).subject;;
+    NSDictionary *calendarItem = [self.eventsList objectAtIndex:indexPath.row];
+    subjectLabel.text = [calendarItem valueForKey:@"subject"]; // ((MSGraphEvent *)[self.eventsList objectAtIndex:indexPath.row]).subject;;
     UILabel *startLabel = (UILabel *)[cell viewWithTag:200];
-    startLabel.text = [NSString stringWithFormat:@"Start: %@",[self converStringToDateString:((MSGraphEvent *)[self.eventsList objectAtIndex:indexPath.row]).start.dateTime]];
+    NSString *startTime = (NSString *)[[calendarItem valueForKey:@"start"] valueForKey:@"dateTime"];
+    NSString *endTime = (NSString *)[[calendarItem valueForKey:@"end"] valueForKey:@"dateTime"];
+    startLabel.text = [NSString stringWithFormat:@"Start: %@",[self converStringToDateString:startTime]];
     UILabel *endLabel = (UILabel *)[cell viewWithTag:300];
-    endLabel.text = [NSString stringWithFormat:@"End: %@",[self converStringToDateString:((MSGraphEvent *)[self.eventsList objectAtIndex:indexPath.row]).end.dateTime]];
+    endLabel.text = [NSString stringWithFormat:@"End: %@",[self converStringToDateString:endTime]];
 ```
 
-![Screenshot of the previous step](img/fig.05.png)
+![Screenshot of the previous step](img/fig.28.png)
 
-10. Build and Run the application. Click the Login button. Now you can see the  events list after you login successfully.
+05. Build and Run the application. Click the Login button. Now you can see the  events list after you login successfully.
 
     ![Screenshot of the previous step](img/fig.04.png)
 
