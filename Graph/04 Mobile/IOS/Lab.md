@@ -85,9 +85,10 @@ $(SRCROOT)/Carthage/Build/iOS/MSAL.framework
 ```
 06. Replace the `ENTER_YOUR_CLIENT_ID` with the **Application Id** you received when registering the application.
 
-07. Create a build in XCode by using the command key and B key keyboard combination: <kbd>command</kbd> + <kbd>B</kbd>.
 
 ![Screenshot of the previous step](img/fig.22.png)
+
+07. Create a build in XCode by using the command key and B key keyboard combination: <kbd>command</kbd> + <kbd>B</kbd>.
 
 ## Exercise 2: Authenticate with Azure AD and get the access token
 An access token is required to access Microsoft Graph APIs so your application needs to implement the logic to retrieve and manage access tokens.
